@@ -51,6 +51,7 @@ app.*.map.json
 /android/app/release
 /android/key.properties
 /android/app/upload-keystore.jks
+/upload-keystore.jks.b64
 
 # AI prompt materials
 /ai_prompts/

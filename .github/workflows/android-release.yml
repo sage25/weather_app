@@ -17,6 +17,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restore keystore and key.properties from secrets
+        if: ${{ secrets.KEY_PROPERTIES != '' || secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEY_PROPERTIES:-}" ]; then
+            mkdir -p android
+            printf '%s' "$KEY_PROPERTIES" > android/key.properties
+            echo "Wrote android/key.properties"
+          fi
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            mkdir -p android/app
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            echo "Wrote android/app/upload-keystore.jks"
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:

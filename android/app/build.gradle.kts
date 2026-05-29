@@ -8,8 +8,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
+// Support key.properties located at project root or inside android/ (CI and local variations)
+val candidateKeystoreFiles = listOf(rootProject.file("key.properties"), rootProject.file("android/key.properties"))
+val keystorePropertiesFile = candidateKeystoreFiles.firstOrNull { it.exists() } ?: rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
@@ -58,11 +60,8 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (hasReleaseKeystore) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Use safe lookup: prefer `release` if present, otherwise fall back to `debug` if available.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.findByName("debug")
         }
     }
 }
