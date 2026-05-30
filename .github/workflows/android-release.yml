@@ -61,6 +61,17 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
+      - name: Create main branch pre-release APK
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: main-build
+          name: weather_app-main-build
+          prerelease: true
+          draft: false
+          make_latest: false
+          files: build/app/outputs/flutter-apk/app-release.apk
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
