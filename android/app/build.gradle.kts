@@ -16,15 +16,17 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val storeFilePath = keystoreProperties.getProperty("storeFile")
+val storeFilePath = keystoreProperties.getProperty("storeFile")?.takeIf { it.isNotBlank() }
+val storePassword = keystoreProperties.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+val keyAlias = keystoreProperties.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
+val keyPassword = keystoreProperties.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
 val releaseKeystoreFile = storeFilePath?.let { File(rootProject.rootDir, it) }
 
-val hasReleaseKeystore = listOf(
-    "storeFile",
-    "storePassword",
-    "keyAlias",
-    "keyPassword",
-).all { keystoreProperties.getProperty(it).isNullOrBlank().not() } && releaseKeystoreFile?.exists() == true
+val hasReleaseKeystore =
+    releaseKeystoreFile?.exists() == true &&
+        storePassword != null &&
+        keyAlias != null &&
+        keyPassword != null
 
 android {
     namespace = "com.example.weather_app"
@@ -35,9 +37,9 @@ android {
         if (hasReleaseKeystore) {
             create("release") {
                 storeFile = releaseKeystoreFile
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storePassword = storePassword
+                keyAlias = keyAlias
+                keyPassword = keyPassword
             }
         }
     }
@@ -60,8 +62,12 @@ android {
 
     buildTypes {
         release {
-            // Use safe lookup: prefer `release` if present, otherwise fall back to `debug` if available.
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.findByName("debug")
+            // Prefer the release keystore when CI or local secrets provide it, otherwise use debug signing.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
