@@ -13,18 +13,20 @@ class WeatherDaySummary {
     required this.date,
     required this.dayLabel,
     required this.dateLabel,
+    required this.dawn,
     required this.morning,
     required this.afternoon,
-    required this.sixHourWindows,
+    required this.evening,
     required this.twoHourWindows,
   });
 
   final DateTime date;
   final String dayLabel;
   final String dateLabel;
+  final WeatherPeriodSummary dawn;
   final WeatherPeriodSummary morning;
   final WeatherPeriodSummary afternoon;
-  final List<WeatherPeriodSummary> sixHourWindows;
+  final WeatherPeriodSummary evening;
   final List<WeatherPeriodSummary> twoHourWindows;
 }
 
@@ -75,17 +77,25 @@ WeatherForecastSummary buildWeatherForecastSummary(OpenMeteoForecast forecast) {
         date: day,
         dayLabel: index == 0 ? '今天' : '明天',
         dateLabel: _formatDateLabel(day),
+        dawn: _buildPeriodSummary(
+          label: '凌晨',
+          samples: daySamples.where((OpenMeteoHourlySample sample) => sample.time.hour < 6).toList(),
+        ),
         morning: _buildPeriodSummary(
           label: '上午',
-          samples: daySamples.where((OpenMeteoHourlySample sample) => sample.time.hour < 12).toList(),
+          samples: daySamples
+              .where((OpenMeteoHourlySample sample) => sample.time.hour >= 6 && sample.time.hour < 12)
+              .toList(),
         ),
         afternoon: _buildPeriodSummary(
           label: '下午',
-          samples: daySamples.where((OpenMeteoHourlySample sample) => sample.time.hour >= 12).toList(),
+          samples: daySamples
+              .where((OpenMeteoHourlySample sample) => sample.time.hour >= 12 && sample.time.hour < 18)
+              .toList(),
         ),
-        sixHourWindows: _buildWindows(
-          daySamples,
-          windowSizeHours: 6,
+        evening: _buildPeriodSummary(
+          label: '晚上',
+          samples: daySamples.where((OpenMeteoHourlySample sample) => sample.time.hour >= 18).toList(),
         ),
         twoHourWindows: _buildWindows(
           daySamples,
@@ -114,6 +124,7 @@ List<WeatherPeriodSummary> _buildWindows(
       _buildPeriodSummary(
         label: _formatHourWindowLabel(startHour, endHour),
         samples: windowSamples,
+        useAverageTemperature: windowSizeHours == 2,
       ),
     );
   }
@@ -123,6 +134,7 @@ List<WeatherPeriodSummary> _buildWindows(
 WeatherPeriodSummary _buildPeriodSummary({
   required String label,
   required List<OpenMeteoHourlySample> samples,
+  bool useAverageTemperature = false,
 }) {
   if (samples.isEmpty) {
     return WeatherPeriodSummary(
@@ -134,7 +146,9 @@ WeatherPeriodSummary _buildPeriodSummary({
   }
 
   final String weatherLabel = _dominantWeatherLabel(samples);
-  final String temperatureText = _formatTemperatureText(samples);
+  final String temperatureText = useAverageTemperature
+      ? _formatAverageTemperatureText(samples)
+      : _formatTemperatureText(samples);
   return WeatherPeriodSummary(
     label: label,
     summaryText: '$weatherLabel $temperatureText',
@@ -173,8 +187,16 @@ String _formatTemperatureText(List<OpenMeteoHourlySample> samples) {
   return '${minTemperature.floor()}-${maxTemperature.ceil()}℃';
 }
 
+String _formatAverageTemperatureText(List<OpenMeteoHourlySample> samples) {
+  final double averageTemperature = samples
+          .map((OpenMeteoHourlySample sample) => sample.temperature2m)
+          .reduce((double left, double right) => left + right) /
+      samples.length;
+  return averageTemperature.round().toString();
+}
+
 String _formatHourWindowLabel(int startHour, int endHour) {
-  return '${_twoDigits(startHour)}:00-${_twoDigits(endHour)}:00';
+  return '${_twoDigits(startHour)}~${_twoDigits(endHour)}';
 }
 
 String _formatDateLabel(DateTime date) {
@@ -194,9 +216,9 @@ String weatherCodeToLabel(int code) {
     case 0:
       return '晴';
     case 1:
-      return '大部晴';
+      return '晴';
     case 2:
-      return '局部多云';
+      return '多云';
     case 3:
       return '多云';
     case 45:
@@ -205,10 +227,10 @@ String weatherCodeToLabel(int code) {
     case 51:
     case 53:
     case 55:
-      return '毛毛雨';
+      return '小雨';
     case 56:
     case 57:
-      return '冻毛毛雨';
+      return '冻雨';
     case 61:
       return '小雨';
     case 63:

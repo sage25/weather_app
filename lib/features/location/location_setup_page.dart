@@ -4,6 +4,11 @@ import '../../core/location/coordinates.dart';
 import '../../core/location/location_store.dart';
 import '../../core/location/location_validator.dart';
 
+const Coordinates _defaultCoordinates = Coordinates(
+  latitude: 39.9042,
+  longitude: 116.4074,
+);
+
 class LocationSetupPage extends StatefulWidget {
   const LocationSetupPage({
     super.key,
@@ -30,10 +35,10 @@ class _LocationSetupPageState extends State<LocationSetupPage> {
   void initState() {
     super.initState();
     _latitudeController = TextEditingController(
-      text: widget.initialCoordinates?.latitude.toString() ?? '',
+      text: (widget.initialCoordinates ?? _defaultCoordinates).latitude.toString(),
     );
     _longitudeController = TextEditingController(
-      text: widget.initialCoordinates?.longitude.toString() ?? '',
+      text: (widget.initialCoordinates ?? _defaultCoordinates).longitude.toString(),
     );
   }
 

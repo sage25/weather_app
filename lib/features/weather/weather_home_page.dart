@@ -5,6 +5,7 @@ import '../../core/location/location_store.dart';
 import '../../core/weather/open_meteo_client.dart';
 import '../../core/weather/open_meteo_exceptions.dart';
 import '../../core/weather/weather_aggregation.dart';
+import '../../core/weather/weather_home_layout.dart';
 import '../location/location_setup_page.dart';
 import '../error/blank_error_page.dart';
 
@@ -26,6 +27,7 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
   late Coordinates _coordinates;
   late OpenMeteoClient _client;
   late Future<WeatherForecastSummary> _forecastFuture;
+  bool _layoutSpecRecorded = false;
 
   @override
   void initState() {
@@ -119,21 +121,24 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
 
           return LayoutBuilder(
             builder: (BuildContext context, BoxConstraints constraints) {
-              return SingleChildScrollView(
-                child: Column(
-                  children: <Widget>[
-                    _WeatherDayPanel(
-                      summary: summary.days.first,
-                      backgroundColor: const Color(0xFFE7F0FF),
-                      minHeight: constraints.maxHeight,
-                    ),
-                    if (summary.days.length > 1)
-                      _WeatherDayPanel(
-                        summary: summary.days[1],
-                        backgroundColor: const Color(0xFFFFF0E4),
-                        minHeight: constraints.maxHeight,
-                      ),
-                  ],
+              final WeatherHomeLayoutSpec layoutSpec = buildWeatherHomeLayoutSpec(
+                Size(constraints.maxWidth, constraints.maxHeight),
+              );
+              _recordLayoutSpecOnce(layoutSpec);
+
+              return SafeArea(
+                top: false,
+                child: PageView.builder(
+                  scrollDirection: Axis.vertical,
+                  physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
+                  itemCount: summary.days.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return _WeatherDayPanel(
+                      summary: summary.days[index],
+                      backgroundColor: index == 0 ? const Color(0xFFE7F0FF) : const Color(0xFFFFF0E4),
+                      layoutSpec: layoutSpec,
+                    );
+                  },
                 ),
               );
             },
@@ -141,6 +146,17 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
         },
       ),
     );
+  }
+
+  void _recordLayoutSpecOnce(WeatherHomeLayoutSpec layoutSpec) {
+    if (_layoutSpecRecorded) {
+      return;
+    }
+
+    _layoutSpecRecorded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      recordWeatherHomeLayoutSpec(layoutSpec);
+    });
   }
 }
 
@@ -163,81 +179,63 @@ class _WeatherDayPanel extends StatelessWidget {
   const _WeatherDayPanel({
     required this.summary,
     required this.backgroundColor,
-    required this.minHeight,
+    required this.layoutSpec,
   });
 
   final WeatherDaySummary summary;
   final Color backgroundColor;
-  final double minHeight;
+  final WeatherHomeLayoutSpec layoutSpec;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(minHeight: minHeight),
-      color: backgroundColor,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          _DayHeader(summary: summary),
-          const SizedBox(height: 20),
-          _PeriodHighlight(
-            title: '上午',
-            summaryText: summary.morning.summaryText,
-          ),
-          const SizedBox(height: 12),
-          _PeriodHighlight(
-            title: '下午',
-            summaryText: summary.afternoon.summaryText,
-          ),
-          const SizedBox(height: 22),
-          Text(
-            '6 小时总览',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: summary.sixHourWindows.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.85,
+    return SizedBox.expand(
+      child: Container(
+        color: backgroundColor,
+        padding: layoutSpec.pagePadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _DayHeader(summary: summary),
+            SizedBox(height: layoutSpec.pageHeaderGap),
+            _PeriodHighlight(
+              title: '凌晨',
+              summaryText: summary.dawn.summaryText,
+              layoutSpec: layoutSpec,
             ),
-            itemBuilder: (BuildContext context, int index) {
-              final WeatherPeriodSummary period = summary.sixHourWindows[index];
-              return _PeriodCard(summary: period);
-            },
-          ),
-          const SizedBox(height: 22),
-          Text(
-            '2 小时分组',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: summary.twoHourWindows.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.15,
+            SizedBox(height: layoutSpec.periodGap),
+            _PeriodHighlight(
+              title: '上午',
+              summaryText: summary.morning.summaryText,
+              layoutSpec: layoutSpec,
             ),
-            itemBuilder: (BuildContext context, int index) {
-              final WeatherPeriodSummary period = summary.twoHourWindows[index];
-              return _SmallPeriodCard(summary: period);
-            },
-          ),
-        ],
+            SizedBox(height: layoutSpec.periodGap),
+            _PeriodHighlight(
+              title: '下午',
+              summaryText: summary.afternoon.summaryText,
+              layoutSpec: layoutSpec,
+            ),
+            SizedBox(height: layoutSpec.periodGap),
+            _PeriodHighlight(
+              title: '晚上',
+              summaryText: summary.evening.summaryText,
+              layoutSpec: layoutSpec,
+            ),
+            SizedBox(height: layoutSpec.twoHourSectionGap),
+            Text(
+              '2 小时分组',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            SizedBox(height: layoutSpec.periodGap),
+            Expanded(
+              child: _TwoHourGrid(
+                periods: summary.twoHourWindows,
+                layoutSpec: layoutSpec,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -275,23 +273,29 @@ class _DayHeader extends StatelessWidget {
 }
 
 class _PeriodHighlight extends StatelessWidget {
-  const _PeriodHighlight({required this.title, required this.summaryText});
+  const _PeriodHighlight({
+    required this.title,
+    required this.summaryText,
+    required this.layoutSpec,
+  });
 
   final String title;
   final String summaryText;
+  final WeatherHomeLayoutSpec layoutSpec;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      padding: layoutSpec.periodCardPadding,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(layoutSpec.periodCardRadius),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SizedBox(
-            width: 66,
+            width: 60,
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -299,6 +303,7 @@ class _PeriodHighlight extends StatelessWidget {
                   ),
             ),
           ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               summaryText,
@@ -313,35 +318,56 @@ class _PeriodHighlight extends StatelessWidget {
   }
 }
 
-class _PeriodCard extends StatelessWidget {
-  const _PeriodCard({required this.summary});
+class _SmallPeriodCard extends StatelessWidget {
+  const _SmallPeriodCard({required this.summary, required this.layoutSpec});
 
   final WeatherPeriodSummary summary;
+  final WeatherHomeLayoutSpec layoutSpec;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-          Text(
-            summary.label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Colors.black54,
-                ),
+          SizedBox(
+            width: layoutSpec.twoHourLabelWidth,
+            child: Text(
+              summary.label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            summary.summaryText,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              summary.weatherLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: layoutSpec.twoHourTemperatureWidth,
+            child: Text(
+              summary.temperatureText,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
         ],
       ),
@@ -349,38 +375,38 @@ class _PeriodCard extends StatelessWidget {
   }
 }
 
-class _SmallPeriodCard extends StatelessWidget {
-  const _SmallPeriodCard({required this.summary});
+class _TwoHourGrid extends StatelessWidget {
+  const _TwoHourGrid({required this.periods, required this.layoutSpec});
 
-  final WeatherPeriodSummary summary;
+  final List<WeatherPeriodSummary> periods;
+  final WeatherHomeLayoutSpec layoutSpec;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Text(
-            summary.label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.black54,
-                ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final int columns = layoutSpec.twoHourCrossAxisCount;
+        final int rows = (periods.length / columns).ceil();
+        final double rowSpacing = layoutSpec.twoHourGridSpacing;
+        final double itemWidth = (constraints.maxWidth - rowSpacing * (columns - 1)) / columns;
+        final double itemHeight = (constraints.maxHeight - rowSpacing * (rows - 1)) / rows;
+        final double childAspectRatio = itemWidth / itemHeight;
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: periods.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: rowSpacing,
+            crossAxisSpacing: rowSpacing,
+            childAspectRatio: childAspectRatio,
           ),
-          const SizedBox(height: 6),
-          Text(
-            summary.summaryText,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
+          itemBuilder: (BuildContext context, int index) {
+            return _SmallPeriodCard(summary: periods[index], layoutSpec: layoutSpec);
+          },
+        );
+      },
     );
   }
 }

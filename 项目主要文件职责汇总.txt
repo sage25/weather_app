@@ -1,0 +1,35 @@
+项目主要文件职责汇总
+
+1. 启动与应用入口
+- lib/main.dart：程序入口；初始化 Flutter 绑定，锁定竖屏方向，然后启动应用。
+- lib/app/weather_app.dart：应用根组件；配置 MaterialApp、主题和首页入口。
+- lib/features/startup/startup_gate.dart：启动分流；读取本地经纬度，决定进入加载页、首次设置页、天气主页或错误页。
+
+2. 位置相关功能
+- lib/core/location/coordinates.dart：经纬度数据模型，表示一个位置坐标。
+- lib/core/location/location_store.dart：位置存储抽象和 SharedPreferences 实现；负责读取、保存和清空经纬度。
+- lib/core/location/location_validator.dart：经纬度校验与表单错误文案；负责判断输入是否合法。
+- lib/features/location/location_setup_page.dart：经纬度设置页；提供首次填写和修改经纬度的表单，保存后通知上层刷新。
+
+3. 天气相关功能
+- lib/core/weather/open_meteo_client.dart：Open-Meteo 接口客户端；拼装请求地址、发起网络请求、解析响应并抛出统一异常。
+- lib/core/weather/open_meteo_models.dart：Open-Meteo 接口数据模型；把原始 JSON 转成可用的天气实体。
+- lib/core/weather/weather_aggregation.dart：天气数据聚合层；把逐时数据整理成今天/明天摘要、上午/下午、6 小时和 2 小时分组视图，并把天气码映射成中文描述。
+- lib/core/weather/open_meteo_exceptions.dart：天气请求相关异常定义；区分网络失败、解析失败和空数据。
+- lib/features/weather/weather_home_page.dart：天气主页；根据当前经纬度请求天气，展示今天和明天的天气卡片，支持重新加载和进入经纬度修改页。
+
+4. 错误与交互
+- lib/features/error/blank_error_page.dart：空白错误页；展示错误提示并提供重试按钮。
+
+5. 测试文件
+- test/core/location/location_validator_test.dart：验证经纬度校验规则是否正确。
+- test/core/location/location_store_test.dart：验证经纬度能否正确保存和读取。
+- test/core/weather/weather_aggregation_test.dart：验证天气聚合逻辑和天气码文案映射。
+- test/core/weather/open_meteo_client_test.dart：验证接口地址、响应解析和异常包装逻辑。
+
+6. 项目配置与说明
+- pubspec.yaml：项目依赖、SDK 版本和 Flutter 配置。
+- README.md：项目简介、功能说明、运行方式和目录结构说明。
+
+7. 整体职责概括
+- 这个项目的主链路是：启动时读取本地经纬度，如果没有就先填写位置；然后调用 Open-Meteo 获取天气；最后在主页展示今天和明天的摘要以及分组视图。
